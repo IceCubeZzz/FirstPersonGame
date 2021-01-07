@@ -1,6 +1,5 @@
 // Copyright (C) Brandon DeSiata. 2020. All Rights Reserved.
 
-
 #include "Weapon_CPP.h"
 
 // Sets default values
@@ -27,6 +26,11 @@ void AWeapon_CPP::BeginPlay()
 	}
 }
 
+void AWeapon_CPP::ActivateSpecialAbility()
+{
+
+}
+
 // Called every frame
 void AWeapon_CPP::Tick(float DeltaTime)
 {
@@ -47,6 +51,21 @@ void AWeapon_CPP::SetLocationToFireTowards(FVector NewLocation)
 void AWeapon_CPP::FireTowardsLocation()
 {
 
+}
+
+void AWeapon_CPP::SetAimOffset(FVector Offset)
+{
+	AimOffset = -Offset;
+}
+
+FVector AWeapon_CPP::GetAimOffset()
+{
+	return AimOffset;
+}
+
+bool AWeapon_CPP::GetWeaponCanAim()
+{
+	return WeaponCanAim;
 }
 
 bool AWeapon_CPP::Fire()
@@ -122,6 +141,11 @@ float AWeapon_CPP::GetWeaponDamage()
 float AWeapon_CPP::GetWeaponSwitchTime()
 {
 	return WeaponSwitchTime;
+}
+
+float AWeapon_CPP::GetWeaponAimInterpSpeed()
+{
+	return WeaponAimInterpSpeed;
 }
 
 float AWeapon_CPP::GetWeaponRecoilCameraShakeScale()

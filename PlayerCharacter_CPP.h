@@ -101,35 +101,47 @@ protected:
 	// Determines speed at which player's mesh comes out of reload sequence
 	float WeaponReloadOutInterpSpeed = 10.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	UAnimSequence* KickAnimation;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickDamage = 25.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickCooldown = .4f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickImpulse = 100000.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	USoundCue* KickSound;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickHeadTiltInterpSpeed =	14.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	float SlideHeadTiltInterpSpeed = 7.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	float DefaultHeadTiltBackInterpSpeed = 5.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	FVector KickTraceStartPoint = FVector(0, -20, 1);
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	// How long will enemy remain as ragdoll after being kicked
-	float KickRagdollTimer = 2.75f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickTimeUntilTiltBack = .25f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickHeadTilt = 10.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	float KickSphereTraceRadius = 200.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// Time between subsequent calls to PlayerPhysicalBalance()
 	float BalanceSphereTraceRate = 0.033333;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	// How far in front of the player will weapon be when aiming down sights
+	float AimDistanceFromPlayer = 5.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	// Determines time between updates for mesh position while aiming down sights
+	float AimTimerResolution = .05f; 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	// Determines how close mesh must be to target destination for movement to stop while aiming
+	// Distance is squared because taking squared root to find distance between two vectors is slow
+	float AimDistanceToleranceSquared = .05f;
+
+	/* KICK SETTINGS */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	UAnimSequence* KickAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickDamage = 25.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickCooldown = .4f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickImpulse = 100000.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	USoundCue* KickSound;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickHeadTiltInterpSpeed = 14.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	FVector KickTraceStartPoint = FVector(0, -20, 1);
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	// How long will enemy remain as ragdoll after being kicked
+	float KickRagdollTimer = 2.75f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickTimeUntilTiltBack = .25f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickHeadTilt = 10.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
+	float KickSphereTraceRadius = 200.0f;
 
 	/* MOVEMENT SETTINGS*/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Movement")
@@ -273,12 +285,12 @@ protected:
 	 * where the mesh will move to, but this is slightly more performant
 	 */
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
-	FVector WeaponSwitchMeshMoveDistance;
-	FVector CurrentWeaponSwitchMoveDistance;
+	FVector WeaponSwitchMeshMoveDistance = FVector::ZeroVector;
+	FVector CurrentWeaponSwitchMoveDistance = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
-	FVector WeaponReloadMeshMoveDistance;
-	FVector CurrentReloadMoveDistance;
+	FVector WeaponReloadMeshMoveDistance = FVector::ZeroVector;
+	FVector CurrentReloadMoveDistance = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
 	float TimeBetweenItemTrace = .05f;
@@ -305,6 +317,16 @@ protected:
 	/* VISUAL TIMER VARIABLES */
 	FTimerHandle BalanceSphereTraceTimerHandle;
 	FTimerHandle SetGravityScaleTimerHandle;
+
+	bool IsAiming = false;
+	// How close to the target location is the mesh while aiming
+	float CurrentAimAlpha = 0.0f;
+	FVector MeshTargetWorldLocationAiming;
+	FVector CurrentMeshAimDistance = FVector::ZeroVector;
+	FTimerHandle AimingTimerHandle;
+
+	// Sum of mesh relative offsets (CurrentMeshRaiseDistance, CurrentMeshAimDistance, MeshOriginalRelativeLocation, etc.)
+	// FVector MeshTotalRelativeLocationOffset;
 
 	UFUNCTION(BlueprintCallable)
 	float SubtractStamina(float StaminaLoss);
@@ -334,11 +356,14 @@ protected:
 	UFUNCTION()
 	void FireWeapon(float PrimaryFireAxis);
 
-	// Enable special ability of current weapon (if it has one)
-	void EnableWeaponSpecial();
+	UFUNCTION()
+	// Activate special ability of current weapon (if it has one)
+	void ActivateWeaponSpecial();
 
-	// Disable special ability of current weapon (if it has one)
-	void DisableWeaponSpecial();
+	UFUNCTION()
+	void ToggleAim();
+
+	void AimMoveMesh();
 
 	UFUNCTION()
 	void BeginReloadAnimation();

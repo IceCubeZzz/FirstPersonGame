@@ -65,8 +65,16 @@ protected:
 	// Distance the player's weapon mesh is smoothstepped to after shots are fired (used to further the effect of recoil)
 	float WeaponRecoilMoveDistance = 5.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	// If set to true, firing event will take place at the location of fire socket. If false, they will take place at player eye height.
+	// If true, firing event will take place at the location of fire socket. If false, they will take place at player eye height.
 	bool ShouldFireFromSocket = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	bool WeaponCanAim = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	// How long will it take to aim with this weapon (if the weapon can aim)
+	float WeaponAimInterpSpeed = .75f;
+
+	// Vector dictating additive to location the player mesh will be moved to while simulating aiming 
+	FVector	AimOffset = FVector::ZeroVector;
 
 	/**
 	 * Because some gun meshes are static meshes, while others are skeletal meshes,
@@ -105,10 +113,19 @@ public:
 
 	virtual bool BeginReloadAnimation();
 
+	virtual void ActivateSpecialAbility();
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetLocationToFireTowards(FVector NewLocation);
 
 	virtual void FireTowardsLocation();
+
+	UFUNCTION(BlueprintCallable)
+	void SetAimOffset(FVector Offset);
+
+	FVector GetAimOffset();
+
+	bool GetWeaponCanAim();
 
 	/**
 	 * Initiates post reload animation logic (for example, reloading the current clip)
@@ -154,6 +171,8 @@ public:
 	float GetWeaponDamage();
 
 	float GetWeaponSwitchTime();
+
+	float GetWeaponAimInterpSpeed();
 
 	float GetWeaponRecoilCameraShakeScale();
 

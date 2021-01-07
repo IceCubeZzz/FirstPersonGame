@@ -104,21 +104,6 @@ void ABaseGun::PlayMuzzleFlash()
 	}
 }
 
-void ABaseGun::SetScopeOffset(FVector Offset)
-{
-	ScopeOffset = -Offset;
-}
-
-void ABaseGun::EnableSpecialAbility()
-{
-
-}
-
-void ABaseGun::DisableSpecialAbility()
-{
-
-}
-
 void ABaseGun::PlayGunFireAnimation()
 {
 	if(WeaponMeshSkeletal->IsActive())

@@ -303,14 +303,65 @@ void APlayerCharacter_CPP::FireWeapon(float PrimaryFireAxis)
 	}
 }
 
-void APlayerCharacter_CPP::EnableWeaponSpecial()
+void APlayerCharacter_CPP::ActivateWeaponSpecial()
 {
-
+	/* If aiming down sights is possible with current weapon, then aiming down sights
+	 * is the weapon's special ability. 
+	 */
+	if (SelectedWeapon->GetWeaponCanAim())
+	{
+		ToggleAim();
+	}
+	else
+	{
+		SelectedWeapon->ActivateSpecialAbility();
+	}
 }
 
-void APlayerCharacter_CPP::DisableWeaponSpecial()
+void APlayerCharacter_CPP::ToggleAim()
 {
+	if (!IsAiming)
+	{
+		// Move mesh in front of player's view with an offset specified by the weapon
+		FVector EyeLocation;
+		FRotator EyeRotation;
+		CameraManager->GetActorEyesViewPoint(EyeLocation, EyeRotation);
 
+		MeshTargetWorldLocationAiming = EyeLocation + (EyeRotation.Vector() * AimDistanceFromPlayer) + SelectedWeapon->GetAimOffset();
+
+		IsAiming = true;
+
+		if ( !(GetWorld()->GetTimerManager().IsTimerActive(AimingTimerHandle)) )
+		{
+			GetWorld()->GetTimerManager().SetTimer(AimingTimerHandle, this, &APlayerCharacter_CPP::AimMoveMesh, AimTimerResolution, true);
+		}
+	}
+	else
+	{
+		IsAiming = false;
+	}
+}
+
+void APlayerCharacter_CPP::AimMoveMesh()
+{
+	if (IsAiming)
+	{
+		CurrentMeshAimDistance = FMath::VInterpTo(CurrentMeshAimDistance, MeshTargetWorldLocationAiming, AimTimerResolution, SelectedWeapon->GetWeaponAimInterpSpeed());
+		if (FVector::DistSquared(CurrentMeshAimDistance, MeshTargetWorldLocationAiming) < AimDistanceToleranceSquared)
+		{
+			GetWorld()->GetTimerManager().ClearTimer(AimingTimerHandle);
+		}
+	}
+	else
+	{
+		CurrentMeshAimDistance = FMath::VInterpTo(CurrentMeshAimDistance, FVector::ZeroVector, AimTimerResolution, SelectedWeapon->GetWeaponAimInterpSpeed());
+		if (FVector::DistSquared(CurrentMeshAimDistance, FVector::ZeroVector) < AimDistanceToleranceSquared)
+		{
+			GetWorld()->GetTimerManager().ClearTimer(AimingTimerHandle);
+		}
+	}
+
+	GetMesh()->SetRelativeLocation(MeshOriginalRelativeLocation + CurrentMeshRaiseDistance + FVector(0, 0, CurrentMeshRaiseDistance), false);
 }
 
 void APlayerCharacter_CPP::BeginReloadAnimation()
@@ -382,13 +433,15 @@ void APlayerCharacter_CPP::Tick(float DeltaTime)
 	{ 
 		HandleDodgeInputTimers(DeltaTime);
 	}
+	
+	//MeshTotalRelativeLocationOffset = CurrentMeshRaiseDistance + FVector(0, 0, CurrentMeshRaiseDistance);
 }
 
 // Called to bind functionality to input
 void APlayerCharacter_CPP::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
+	
 	InputComponent->BindAction("Kick", IE_Pressed, this, &APlayerCharacter_CPP::Kick);
 
 	InputComponent->BindAxis("Primary Fire", this, &APlayerCharacter_CPP::FireWeapon);
@@ -401,8 +454,8 @@ void APlayerCharacter_CPP::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 	InputComponent->BindAction("Grapple", IE_Pressed, this, &APlayerCharacter_CPP::GrappleBeltToggle);
 
-	InputComponent->BindAction("Secondary Fire", IE_Pressed, this, &APlayerCharacter_CPP::EnableWeaponSpecial);
-	InputComponent->BindAction("Secondary Fire", IE_Released, this, &APlayerCharacter_CPP::DisableWeaponSpecial);
+	InputComponent->BindAction("Secondary Fire", IE_Pressed, this, &APlayerCharacter_CPP::ActivateWeaponSpecial);
+	InputComponent->BindAction("Secondary Fire", IE_Released, this, &APlayerCharacter_CPP::ActivateWeaponSpecial);
 
 	DECLARE_DELEGATE_OneParam(FSwitchWeaponInputDelegate, const int);
 	InputComponent->BindAction<FSwitchWeaponInputDelegate>("Switch Weapon 1", IE_Pressed, this, &APlayerCharacter_CPP::BeginSwitchWeaponSequence, 0);
@@ -803,7 +856,7 @@ void APlayerCharacter_CPP::HandlePhysicalRecoil(float DeltaTime)
 			float LerpAlpha = FMath::SmoothStep(0.0f, CurrentRecoilTime, DeltaTimeCorrection);
 			CurrentMeshRaiseDistance = FMath::Lerp(0.0f, MeshRaiseDistance, LerpAlpha);
 
-			GetMesh()->SetRelativeLocation(MeshOriginalRelativeLocation + FVector(0, 0, CurrentMeshRaiseDistance), false);
+			GetMesh()->SetRelativeLocation(MeshOriginalRelativeLocation + CurrentMeshAimDistance + FVector(0, 0, CurrentMeshRaiseDistance), false);
 
 			CurrentRecoilTime -= DeltaTime;
 		}
@@ -902,7 +955,7 @@ void APlayerCharacter_CPP::HandleWeaponReload(float DeltaTime)
 		/**
 		 * MeshRaiseDistance is the distance the mesh is raised due to recoil simulation. Use it to simulate relative location
 		 */
-		//GetMesh()->SetRelativeLocation(MeshOriginalRelativeLocation + CurrentReloadMoveDistance + FVector(0, 0, CurrentMeshRaiseDistance), false);
+		//GetMesh()->SetRelativeLocation(MeshOriginalRelativeLocation + CurrentReloadMoveDistance + FVector(0, 0, CurrentMeshRaiseDistance + CurrentMeshAimDistance), false);
 
 		InitialReloadTime -= DeltaTime;
 		TotalReloadTime -= DeltaTime;

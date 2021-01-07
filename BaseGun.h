@@ -53,10 +53,6 @@ protected:
 	// Time for which muzzle flash particle effect remains visible
 	float MuzzleFlashTimeBeforeDisable = .1f;
 
-	//UPROPERTY(EditDefaultsOnly, Category = "Gun")
-	// Vector dictating where the player mesh will be moved to simulate aiming down sights
-	FVector	ScopeOffset = FVector::ZeroVector;
-
 	// Ammo in current magazine
 	int CurrentAmmoClip;
 	// Current total ammo
@@ -97,15 +93,6 @@ protected:
 	bool ShouldLineTraceTest = true;
 	FVector LineTraceStartLocation;
 	FRotator LineTraceStartRotation;
-
-	UFUNCTION(BlueprintCallable)
-	void SetScopeOffset(FVector Offset);
-
-	// Enable the special ability of the gun
-	virtual void EnableSpecialAbility();
-
-	// Disable the special ability of the gun
-	virtual void DisableSpecialAbility();
 
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
