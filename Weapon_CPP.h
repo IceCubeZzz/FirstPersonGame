@@ -70,11 +70,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	bool WeaponCanAim = false;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	// How long will it take to aim with this weapon (if the weapon can aim)
-	float WeaponAimInterpSpeed = .75f;
-
-	// Vector dictating additive to location the player mesh will be moved to while simulating aiming 
-	FVector	AimOffset = FVector::ZeroVector;
+	// Time it takes to fully aim with the weapon
+	float WeaponAimTime = .25f;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	// How fast weapon will move into place while aiming. Currently unused as smoothstep is being used in place of interp
+	float WeaponAimLocationInterpSpeed = 6.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	// How fast weapon will rotate while aiming. Weapon must be rotated because it is not pointing directly forwards while it is in the player's hands
+	float WeaponAimRotationInterpSpeed = 12.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	// Dictates additive to player local mesh location when player is aiming (if the weapon is aimable)
+	FVector	AimOffsetLocation = FVector::ZeroVector;
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	// Dictates additive to player local mesh rotation when player is aiming 
+	FRotator AimOffsetRotation = FRotator::ZeroRotator;
 
 	/**
 	 * Because some gun meshes are static meshes, while others are skeletal meshes,
@@ -121,9 +130,11 @@ public:
 	virtual void FireTowardsLocation();
 
 	UFUNCTION(BlueprintCallable)
-	void SetAimOffset(FVector Offset);
+	void SetAimOffsetLocation(FVector Offset);
 
-	FVector GetAimOffset();
+	FVector GetAimOffsetLocation();
+
+	FRotator GetAimOffsetRotation();
 
 	bool GetWeaponCanAim();
 
@@ -172,7 +183,13 @@ public:
 
 	float GetWeaponSwitchTime();
 
-	float GetWeaponAimInterpSpeed();
+	float GetWeaponAimTime();
+
+	float GetWeaponAimLocationInterpSpeed();
+
+	float GetWeaponAimRotationInterpSpeed();
+	
+	void SetWeaponRecoilCameraShakeScale(float Scale);
 
 	float GetWeaponRecoilCameraShakeScale();
 

@@ -53,14 +53,19 @@ void AWeapon_CPP::FireTowardsLocation()
 
 }
 
-void AWeapon_CPP::SetAimOffset(FVector Offset)
+void AWeapon_CPP::SetAimOffsetLocation(FVector Offset)
 {
-	AimOffset = -Offset;
+	AimOffsetLocation = Offset;
 }
 
-FVector AWeapon_CPP::GetAimOffset()
+FVector AWeapon_CPP::GetAimOffsetLocation()
 {
-	return AimOffset;
+	return AimOffsetLocation;
+}
+
+FRotator AWeapon_CPP::GetAimOffsetRotation()
+{
+	return AimOffsetRotation;
 }
 
 bool AWeapon_CPP::GetWeaponCanAim()
@@ -143,9 +148,24 @@ float AWeapon_CPP::GetWeaponSwitchTime()
 	return WeaponSwitchTime;
 }
 
-float AWeapon_CPP::GetWeaponAimInterpSpeed()
+float AWeapon_CPP::GetWeaponAimTime()
 {
-	return WeaponAimInterpSpeed;
+	return WeaponAimTime;
+}
+
+float AWeapon_CPP::GetWeaponAimLocationInterpSpeed()
+{
+	return WeaponAimLocationInterpSpeed;
+}
+
+float AWeapon_CPP::GetWeaponAimRotationInterpSpeed()
+{
+	return WeaponAimRotationInterpSpeed;
+}
+
+void AWeapon_CPP::SetWeaponRecoilCameraShakeScale(float Scale)
+{
+	WeaponRecoilCameraShakeScale = Scale; 
 }
 
 float AWeapon_CPP::GetWeaponRecoilCameraShakeScale()

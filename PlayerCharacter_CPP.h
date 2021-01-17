@@ -11,16 +11,16 @@
 #include "PlayerCharacter_CPP.generated.h"
 
 #define POST_PROCESS_LENS_DISTORTION_INDEX 1
-#define MESH_POST_RELOAD_INTERP_TOLERANCE .1
-#define MESH_POST_RELOAD_IS_RELOADING_TOLERANCE 6.0f
-#define WEAPON_RELOAD_VISUAL_FACTOR 2.5
+#define MESH_POST_RELOAD_INTERP_TOLERANCE_SQUARED .1f
+#define MESH_POST_RELOAD_IS_RELOADING_TOLERANCE_SQUARED 6.0f
+#define WEAPON_RELOAD_VISUAL_FACTOR 2.5f
 #define COLLISION_CHANNEL_INTERACTABLE ECC_GameTraceChannel2
 
 #define PLAYER_LOCATION_GROUND_OFFSET 70
 #define SPHERE_TRACE_END_Z_OFFSET 100
-#define SPHERE_TRACE_RADIUS 2.5
+#define SPHERE_TRACE_RADIUS 2.5f
 
-#define SET_GRAVITY_SCALE_RATE .05
+#define SET_GRAVITY_SCALE_RATE .05f
 
 #define ENEMY_TAG "Enemy"
 
@@ -107,16 +107,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// Time between subsequent calls to PlayerPhysicalBalance()
 	float BalanceSphereTraceRate = 0.033333;
+
+	/* AIM SETTINGS */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// How far in front of the player will weapon be when aiming down sights
-	float AimDistanceFromPlayer = 5.0f;
+	float AimClosenessFactor = 10.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// Determines time between updates for mesh position while aiming down sights
-	float AimTimerResolution = .05f; 
+	float AimTimerResolution = 1.0f/60.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// Determines how close mesh must be to target destination for movement to stop while aiming
 	// Distance is squared because taking squared root to find distance between two vectors is slow
-	float AimDistanceToleranceSquared = .05f;
+	float AimDistanceToleranceSquared = .005f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	// Scales the recoil when aiming
+	float AimRecoilMultiplier = .1f;
+
+	/* CAMERA SETTINGS*/
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Camera")
+	// Maximum distance the camera can lag behind player's current location
+	float CameraLagMaxDistanceAiming = .12f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Camera")
+	// Speed at which camera reaches target location
+	float CameraLagSpeedAiming = 15.0f;
+
 
 	/* KICK SETTINGS */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Kick")
@@ -169,7 +183,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	float ChromaticAberrationDefault = 1.0f;
 
-	/* HEAD TILT SETTINGS */
+	/* HEAD TILT VARIABLES */
 	float CurrentHeadTiltInterpSpeed = 0.0f;
 	// Desired head tilt amount in degrees
 	float DesiredHeadTilt = 0.0f;
@@ -276,8 +290,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	float WeaponSwitchInInterpSpeed = 10.0f;
 	
-	// Used for physical recoil simulation
+	// Used when moving mesh to new relative location
 	FVector MeshOriginalRelativeLocation;
+	// Used when rotating mesh to new relative rotation
+	FQuat MeshOriginalRelativeRotation;
 
 	/**
 	 * Location value that is added to the player's mesh to when switching weapons
@@ -286,11 +302,11 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
 	FVector WeaponSwitchMeshMoveDistance = FVector::ZeroVector;
-	FVector CurrentWeaponSwitchMoveDistance = FVector::ZeroVector;
+	FVector CurrentWeaponSwitchMoveOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
 	FVector WeaponReloadMeshMoveDistance = FVector::ZeroVector;
-	FVector CurrentReloadMoveDistance = FVector::ZeroVector;
+	FVector CurrentReloadMoveOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
 	float TimeBetweenItemTrace = .05f;
@@ -298,11 +314,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Setup")
 	float TickLineTraceDistance = 250.0f;
 
+	/* CAMERA VARIABLES */
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCamera;
 
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraSpringArmComponent;
+
+	float CameraLagMaxDistanceDefault;
+	float CameraLagSpeedDefault;
 
 	UPROPERTY(BlueprintReadWrite)
 	class AGrappleBelt* GrappleBelt;
@@ -318,15 +338,23 @@ protected:
 	FTimerHandle BalanceSphereTraceTimerHandle;
 	FTimerHandle SetGravityScaleTimerHandle;
 
+	/* AIMING VARIABLES */
+	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool IsAiming = false;
+	bool DoneAiming = true;
+	float CurrentAimTime = 0.0f;
 	// How close to the target location is the mesh while aiming
 	float CurrentAimAlpha = 0.0f;
-	FVector MeshTargetWorldLocationAiming;
-	FVector CurrentMeshAimDistance = FVector::ZeroVector;
-	FTimerHandle AimingTimerHandle;
+	FVector MeshTargetLocationAiming = FVector::ZeroVector;
+	FQuat MeshTargetRotationAiming = FQuat::Identity;
+	FVector CurrentMeshLocationAimOffset = FVector::ZeroVector;
+	FQuat CurrentMeshRotationAimOffset = FQuat::Identity;
 
-	// Sum of mesh relative offsets (CurrentMeshRaiseDistance, CurrentMeshAimDistance, MeshOriginalRelativeLocation, etc.)
+	// Sum of mesh relative offsets (CurrentMeshRaiseDistance, CurrentMeshLocationAimOffset, MeshOriginalRelativeLocation, etc.)
 	// FVector MeshTotalRelativeLocationOffset;
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void FinishPlayerInitialization();
 
 	UFUNCTION(BlueprintCallable)
 	float SubtractStamina(float StaminaLoss);
@@ -363,7 +391,7 @@ protected:
 	UFUNCTION()
 	void ToggleAim();
 
-	void AimMoveMesh();
+	void CalculateAimLocation(float DeltaTime);
 
 	UFUNCTION()
 	void BeginReloadAnimation();
@@ -453,8 +481,6 @@ protected:
 	void PlayerPhysicalBalance();
 
 	void SetTickVariables(); 
-
-	void UpdateCameraLocation();
 
 	// Set greater gravity scale when falling to make jumping feel less floaty
 	void UpdateGravityScale();
