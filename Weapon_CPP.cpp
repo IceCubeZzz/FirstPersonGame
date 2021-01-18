@@ -93,9 +93,9 @@ UAnimSequenceBase* AWeapon_CPP::GetPlayerMeshReloadAnimation()
 	return PlayerMeshReloadAnimation;
 }
 
-bool AWeapon_CPP::GetIsAutomatic()
+bool AWeapon_CPP::GetWeaponIsAutomatic()
 {
-	return IsAutomatic;
+	return WeaponIsAutomatic;
 }
 
 int AWeapon_CPP::GetCurrentAmmo()
@@ -104,6 +104,11 @@ int AWeapon_CPP::GetCurrentAmmo()
 }
 
 int AWeapon_CPP::GetTotalAmmo()
+{
+	return -1;
+}
+
+int AWeapon_CPP::GetMaxClipAmmo()
 {
 	return -1;
 }
@@ -193,9 +198,14 @@ float AWeapon_CPP::GetWeaponRecoilIncreaseTime()
 	return WeaponRecoilIncreaseTime;
 }
 
-float AWeapon_CPP::GetWeaponRecoilMoveDistance()
+void AWeapon_CPP::SetWeaponRecoilMoveDistanceMax(float Distance)
 {
-	return WeaponRecoilMoveDistance;
+	WeaponRecoilMoveDistanceMax = Distance;
+}
+
+float AWeapon_CPP::GetWeaponRecoilMoveDistanceMax()
+{
+	return WeaponRecoilMoveDistanceMax;
 }
 
 EWeaponType AWeapon_CPP::GetWeaponType()

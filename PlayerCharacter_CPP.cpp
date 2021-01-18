@@ -8,7 +8,7 @@
 #include "DrawDebugHelpers.h"
 #include "InterfaceUsable.h"
 #include "Weapon_CPP.h"
-#include "BaseGun.h"
+#include "BaseGun_CPP.h"
 #include "WeaponRecoilCameraShake.h"
 #include "GrappleBelt.h"
 #include "PlayerCharacter_AnimInstance_CPP.h"
@@ -111,7 +111,6 @@ void APlayerCharacter_CPP::BeginPlay()
 
 	SetLoopingTimers();
 	SpawnPlayerWeapons();
-	SelectedWeapon = PlayerWeapons[0];
 }
 
 float APlayerCharacter_CPP::SubtractStamina(float StaminaLoss)
@@ -254,10 +253,10 @@ void APlayerCharacter_CPP::TiltHeadBack()
 void APlayerCharacter_CPP::FireWeapon(float PrimaryFireAxis)
 {
 	if (PrimaryFireAxis > 0 && SelectedWeapon && !IsReloading)
-	{
+	{		
 		// If the selected weapon is semi-automatic, only allow the user to fire each time the fire button is pressed down
 		// This means that holding the fire button down will not repeatedly fire the weapon
-		if(!SelectedWeapon->GetIsAutomatic())
+		if(!SelectedWeapon->GetWeaponIsAutomatic())
 		{ 
 			CanFire = !FireButtonHasBeenPressed ? true : false;
 		}
@@ -270,7 +269,7 @@ void APlayerCharacter_CPP::FireWeapon(float PrimaryFireAxis)
 		
 		// Ensure the player can fire, and ensure that there is a valid CameraManager reference before firing
 		if (CanFire && CameraManager)
-		{ 
+		{ 			
 			//APlayerController* PlayerController = Cast<APlayerController>(GetController());
 
 			// Retrieve the point the player is aiming at
@@ -380,7 +379,8 @@ void APlayerCharacter_CPP::CalculateAimLocation(float DeltaTime)
 	CameraSpringArmComponent->CameraLagSpeed = CameraLagSpeedDefault - AimMultiplier * (CameraLagSpeedDefault - CameraLagSpeedAiming);
 
 	// Scale visual recoil according to aim progress (or else visual recoil would seem too intense when aiming)
-	SelectedWeapon->SetWeaponRecoilCameraShakeScale(1.0f - AimMultiplier * (1.0f - AimRecoilMultiplier));
+	SelectedWeapon->WeaponRecoilCameraShakeScaleMultiplier = (AimVisualRecoilMultiplier * AimMultiplier) * SelectedWeapon->GetWeaponRecoilCameraShakeScale();
+	SelectedWeapon->WeaponRecoilMoveDistanceMaxMultiplier = (AimPhysicalRecoilMultiplier * AimMultiplier) * SelectedWeapon->GetWeaponRecoilMoveDistanceMax();
 
 	// When aiming is fully complete, set DoneAiming to true
 	if (AimMultiplier >= 1.0f || AimMultiplier <= 0.0f)
@@ -414,7 +414,7 @@ void APlayerCharacter_CPP::Tick(float DeltaTime)
 	HandleWeaponSwitchOut(DeltaTime);
 	HandleWeaponSwitchIn(DeltaTime);
 
-	HandleWeaponReload(DeltaTime);
+	HandleWeaponReloadVisuals(DeltaTime);
 
 	// Consider using another variable to add aim offsets before setting relative location
 	//MeshTotalRelativeLocationOffset = CurrentMeshRaiseDistance + FVector(0, 0, CurrentMeshRaiseDistance) +... ;
@@ -520,17 +520,18 @@ void APlayerCharacter_CPP::CalculateDamageEffectIntensity(float Damage)
 void APlayerCharacter_CPP::BeginReload()
 {
 	// Check if weapon has intermediate reloading (pumping shotgun, sniper bolt pull, etc.), and if intermediate reload needs to be performed
-	if (SelectedWeapon->GetTimeToReloadIntermediate() > 0.0f && !(SelectedWeapon->GetIntermediateReloadCompleted()))
+	if (SelectedWeapon->GetTimeToReloadIntermediate() > 0.0f && !(SelectedWeapon->GetIntermediateReloadCompleted()) && SelectedWeapon->GetCurrentAmmo() > 0)
 	{
 		// Begin intermediate reload
 		GetWorld()->GetTimerManager().SetTimer(ReloadFinishedTimerHandle, this, &APlayerCharacter_CPP::FinishReload, SelectedWeapon->GetTimeToReloadIntermediate(), false);
 		InitialReloadTime = SelectedWeapon->GetTimeToReloadIntermediate() / WEAPON_RELOAD_VISUAL_FACTOR;
 		TotalReloadTime = SelectedWeapon->GetTimeToReloadIntermediate();
 		IsIntermediateReload = true;
+
+		return;
 	}
 
-	// Reload system using lerping of mesh location
-	if (SelectedWeapon && SelectedWeapon->GetTotalAmmo() > 0 && !IsReloading && !IsFinishingReloadInterp && !IsSwitchingWeaponOut && !IsSwitchingWeaponIn)
+	if (SelectedWeapon && SelectedWeapon->GetTotalAmmo() > 0 && SelectedWeapon->GetCurrentAmmo() < SelectedWeapon->GetMaxClipAmmo() && !IsReloading && !IsFinishingReloadInterp && !IsSwitchingWeaponOut && !IsSwitchingWeaponIn)
 	{
 		GetWorld()->GetTimerManager().SetTimer(ReloadFinishedTimerHandle, this, &APlayerCharacter_CPP::FinishReload, SelectedWeapon->GetTimeToReload(), false);
 
@@ -546,10 +547,6 @@ void APlayerCharacter_CPP::BeginReload()
 	}
 
 	// Reload system using animations
-	//GetMesh()->SetVisibility(false);
-	//if (SelectedWeapon)
-	//{
-	//	SelectedWeapon->HideWeaponMesh();
 
 	//	SelectedWeapon->BeginReload();
 	//	UpdateAmmoUI(SelectedWeapon->GetCurrentAmmo(), SelectedWeapon->GetTotalAmmo());
@@ -590,7 +587,6 @@ void APlayerCharacter_CPP::FinishReload()
 	SelectedWeapon->ShowWeaponMesh();
 	//GetMesh()->SetVisibility(true);
 
-	//IsReloading = false;
 	IsFinishingReloadInterp = true;
 
 	if (SelectedWeapon && AnimationInstance)
@@ -609,8 +605,6 @@ void APlayerCharacter_CPP::FinishReload()
 		UpdateAmmoUI(SelectedWeapon->GetCurrentAmmo(), SelectedWeapon->GetTotalAmmo());
 	}
 	InitialReloadTime = 0.0;
-	
-	// Reload system using lerping of mesh location
 
 	// Reload system using animations
 	//auto* ReloadAnimation = SelectedWeapon->GetPlayerMeshReloadAnimation();
@@ -775,9 +769,12 @@ void APlayerCharacter_CPP::SpawnPlayerWeapons()
 
 				PlayerWeapons.Add(SpawnedWeapon);
 
-				FinishPlayerInitialization();
+				SpawnedWeapon->SetActorHiddenInGame(true);
 			}
 		}
+
+		FinishPlayerInitialization();
+		BeginSwitchWeaponSequence(0);
 	}
 }
 
@@ -785,7 +782,7 @@ void APlayerCharacter_CPP::BeginWeaponRecoilCameraShake()
 {
 	if (CameraManager && WeaponRecoilCameraShakeClass)
 	{
-		float RecoilCameraShakeScale = SelectedWeapon->GetWeaponRecoilCameraShakeScale();
+		float RecoilCameraShakeScale = SelectedWeapon->GetWeaponRecoilCameraShakeScale() * SelectedWeapon->WeaponRecoilCameraShakeScaleMultiplier;
 
 		CameraManager->PlayCameraShake(WeaponRecoilCameraShakeClass, RecoilCameraShakeScale);
 	}
@@ -799,19 +796,27 @@ void APlayerCharacter_CPP::AddWeaponRecoil()
 void APlayerCharacter_CPP::BeginSwitchWeaponSequence(int WeaponIndex)
 {
 	// Do not allow player to switch weapon to the same weapon
-	if(WeaponIndex != WeaponSwitchIndex && !IsReloading && PlayerWeapons.IsValidIndex(WeaponIndex))
-	{ 
+	if(WeaponIndex != WeaponSwitchIndex && !IsReloading && PlayerWeapons.IsValidIndex(WeaponIndex) && PlayerWeapons[WeaponIndex] != nullptr)
+	{
 		WeaponSwitchIndex = WeaponIndex;
 
 		/**
 		 * Note: If weapon is being switched out, more time should not be added to
 		 * CurrentWeaponSwitchOutTime if user chooses a different weapon to switch to
 		 */
-		if(SelectedWeapon && !IsSwitchingWeaponOut)
+		if (!IsSwitchingWeaponOut)
 		{ 
-			IsSwitchingWeaponOut = true;
+			if (SelectedWeapon)
+			{
+				CurrentWeaponSwitchOutTime = SelectedWeapon->GetWeaponSwitchTime();
+			}
+			else
+			{
+				// If player does not currently have weapon equiped, use arbitary WeaponSwitchOut time. This should only occur once per level
+				CurrentWeaponSwitchOutTime = 0.10f;
+			}
 
-			CurrentWeaponSwitchOutTime = SelectedWeapon->GetWeaponSwitchTime();
+			IsSwitchingWeaponOut = true;
 		}
 		/**
 		 * If the user switches weapon while weapon was in switching out phase, 
@@ -826,16 +831,19 @@ void APlayerCharacter_CPP::BeginSwitchWeaponSequence(int WeaponIndex)
 
 void APlayerCharacter_CPP::EndSwitchWeaponSequence()
 {
-	if (WeaponSwitchIndex < PlayerWeapons.Num() && PlayerWeapons[WeaponSwitchIndex] != nullptr)
+	if (WeaponSwitchIndex < PlayerWeapons.Num())
 	{
-		//SelectedWeapon->HideWeaponMesh();
-		SelectedWeapon->SetActorHiddenInGame(true);
+		if (SelectedWeapon)
+		{
+			//SelectedWeapon->HideWeaponMesh();
+			SelectedWeapon->SetActorHiddenInGame(true);
+		}
 
 		SelectedWeapon = PlayerWeapons[WeaponSwitchIndex];
 		AnimationInstance->SetSelectedWeapon(PlayerWeapons[WeaponSwitchIndex]->GetWeaponType());
 		UpdateAmmoUI(SelectedWeapon->GetCurrentAmmo(), SelectedWeapon->GetTotalAmmo());
 
-		ABaseGun* Gun = Cast<ABaseGun>(SelectedWeapon);
+		ABaseGun_CPP* Gun = Cast<ABaseGun_CPP>(SelectedWeapon);
 		if (Gun)
 		{
 			SelectedGun = Gun;
@@ -877,15 +885,13 @@ void APlayerCharacter_CPP::HandlePhysicalRecoil(float DeltaTime)
 			AddControllerYawInput(HorizontalRecoil);
 
 			// Simulate physical recoil
-			float MeshRaiseDistance = SelectedWeapon->GetWeaponRecoilMoveDistance();
+			float MeshRaiseDistance = SelectedWeapon->GetWeaponRecoilMoveDistanceMax() * AimPhysicalRecoilMultiplier;
 
-			/**
-			 * Use smoothstep function to calculate a lerp alpha value so that the raising
-			 * of the player's weapon is faster right after firing (is more appealing visually)
-			 */
-			float LerpAlpha = FMath::SmoothStep(0.0f, CurrentRecoilTime, DeltaTimeCorrection);
-			CurrentMeshRaiseDistance = FMath::Lerp(0.0f, MeshRaiseDistance, LerpAlpha);
+			CurrentMeshRaiseDistance = FMath::FInterpTo(CurrentMeshRaiseDistance, MeshRaiseDistance, DeltaTime, PhysicalRecoilInterpSpeed);
 
+			//float LerpAlpha = FMath::SmoothStep(0.0f, CurrentRecoilTime, DeltaTimeCorrection);
+			//CurrentMeshRaiseDistance = FMath::Lerp(0.0f, MeshRaiseDistance, LerpAlpha);
+			
 			CurrentRecoilTime -= DeltaTime;
 		}
 	}
@@ -918,9 +924,6 @@ void APlayerCharacter_CPP::HandlePhysicalRecoil(float DeltaTime)
 			float PrevMeshRaiseDistance = CurrentMeshRaiseDistance;
 
 			CurrentMeshRaiseDistance = FMath::FInterpTo(CurrentMeshRaiseDistance, 0, DeltaTime, RecoverInterpSpeed);
-
-			//float RecoilDistanceRecovery = PrevMeshRaiseDistance - CurrentMeshRaiseDistance;
-			//GetMesh()->AddRelativeLocation(FVector(0, 0, -RecoilDistanceRecovery));
 		}
 	}
 }
@@ -961,7 +964,7 @@ void APlayerCharacter_CPP::HandleWeaponSwitchIn(float DeltaTime)
 	}
 }
 
-void APlayerCharacter_CPP::HandleWeaponReload(float DeltaTime)
+void APlayerCharacter_CPP::HandleWeaponReloadVisuals(float DeltaTime)
 {
 	// If reloading, lerp mesh to a distance offset
 	if (InitialReloadTime > 0)

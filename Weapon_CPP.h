@@ -19,9 +19,6 @@ public:
 	AWeapon_CPP();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	// This weapon type
 	TEnumAsByte<EWeaponType> Weapon = EWeaponType::SilencedPistol;
@@ -40,7 +37,7 @@ protected:
 	USoundCue* IntermediateReloadSound;
 	UPROPERTY(EditDefaultsOnly)
 	// Should be set to true if the weapon can be repeatedly fired by holding down the fire button 
-	bool IsAutomatic = false;
+	bool WeaponIsAutomatic = false;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	float FireSoundMultiplier = 1.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
@@ -62,8 +59,8 @@ protected:
 	// Time over which recoil increases after weapon fire event is called
 	float WeaponRecoilIncreaseTime = .05f;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon|Recoil")
-	// Distance the player's weapon mesh is smoothstepped to after shots are fired (used to further the effect of recoil)
-	float WeaponRecoilMoveDistance = 5.0f;
+	// Maximum distance the player's mesh can be interped to after shots are fired (used to further the effect of recoil)
+	float WeaponRecoilMoveDistanceMax = 40.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	// If true, firing event will take place at the location of fire socket. If false, they will take place at player eye height.
 	bool ShouldFireFromSocket = false;
@@ -85,6 +82,22 @@ protected:
 	// Dictates additive to player local mesh rotation when player is aiming 
 	FRotator AimOffsetRotation = FRotator::ZeroRotator;
 
+	/* AMMO SETTINGS */
+	UPROPERTY(EditDefaultsOnly, Category = "Ammo")
+	/**
+		* Maximum ammo in a clip
+		* -1 signifies that the gun never has to be reloaded.
+		*/
+	int MaxClipAmmo = -1;
+	UPROPERTY(EditDefaultsOnly, Category = "Ammo")
+	/**
+		* Maximum backup ammo that can be held for this gun
+		* -1 signifies that the gun has no maximum ammo count.
+		*/
+	int MaxBackupAmmo = -1;
+	UPROPERTY(EditDefaultsOnly, Category = "Ammo")
+	int StartingAmmo = MAX_int32;
+
 	/**
 	 * Because some gun meshes are static meshes, while others are skeletal meshes,
 	 * each gun object contains both a static mesh component and a skeletal mesh component;
@@ -101,6 +114,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	UAnimSequenceBase* PlayerMeshFireAnimation;
 
+	// Ammo in current magazine
+	int CurrentAmmoClip;
+	// Current total ammo
+	int CurrentAmmoTotal;
+
 	// Currently unused. Changing mesh location directly instead of using an animation 
 	//UPROPERTY(EditDefaultsOnly)
 	UAnimSequenceBase* PlayerMeshReloadAnimation;
@@ -110,7 +128,16 @@ protected:
 	// Only used for guns that have an intermediate reload time value 
 	bool IntermediateReloadCompleted = true;
 
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
 public:	
+	// Used to manipulate camera shake scale from outside this class
+	float WeaponRecoilCameraShakeScaleMultiplier = 1.0f;
+
+	// Used to manipulate the recoil move distance from outside this class
+	float WeaponRecoilMoveDistanceMaxMultiplier = 1.0f;
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	
@@ -149,7 +176,7 @@ public:
 
 	UAnimSequenceBase* GetPlayerMeshReloadAnimation();
 
-	virtual bool GetIsAutomatic();
+	virtual bool GetWeaponIsAutomatic();
 
 	/**
 	* Returns CurrentAmmoClip. If value of -1 is returned, the weapon does not use clips.
@@ -162,6 +189,8 @@ public:
 	* A melee weapon would always return -1
 	*/
 	virtual int GetTotalAmmo();
+
+	virtual int GetMaxClipAmmo();
 
 	/**
 	* Returns the time it takes this weapon to reload. If the weapon never needs to be reloaded,
@@ -201,7 +230,9 @@ public:
 
 	float GetWeaponRecoilIncreaseTime();
 
-	float GetWeaponRecoilMoveDistance();
+	void SetWeaponRecoilMoveDistanceMax(float Distance);
+
+	float GetWeaponRecoilMoveDistanceMax();
 
 	EWeaponType GetWeaponType();
 

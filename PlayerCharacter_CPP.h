@@ -56,7 +56,9 @@ public:
 	// Current weapon the player has selected 
 	AWeapon_CPP* SelectedWeapon;
 	// Points to a gun if the current weapon the player has selected is a gun
-	class ABaseGun* SelectedGun;
+	class ABaseGun_CPP* SelectedGun;
+	// Index of the weapon that is being switched to
+	int WeaponSwitchIndex = -1;
 
 	UPROPERTY(BlueprintReadWrite)
 	// Intensity of the post process lens distortion applied to player's camera
@@ -107,6 +109,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
 	// Time between subsequent calls to PlayerPhysicalBalance()
 	float BalanceSphereTraceRate = 0.033333;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	float PhysicalRecoilInterpSpeed = 150.0f;
 
 	/* AIM SETTINGS */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
@@ -120,8 +124,11 @@ protected:
 	// Distance is squared because taking squared root to find distance between two vectors is slow
 	float AimDistanceToleranceSquared = .005f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
-	// Scales the recoil when aiming
-	float AimRecoilMultiplier = .1f;
+	// Scales the visual recoil when aiming
+	float AimVisualRecoilMultiplier = .5f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Setup")
+	// Scales the physical recoil when aiming (the physical moving of the weapon)
+	float AimPhysicalRecoilMultiplier = .1f;
 
 	/* CAMERA SETTINGS*/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Camera")
@@ -226,9 +233,6 @@ protected:
 	bool IsSwitchingWeaponOut = false;
 	bool IsSwitchingWeaponIn = false;
 
-	// Index of the weapon that is being switched to
-	int WeaponSwitchIndex = 0;
-
 	// Reference to the timer that sets off a line trace every X seconds to trace for items 
 	FTimerHandle ItemTraceTimerHandle;
 	FTimerHandle ReloadFinishedTimerHandle;
@@ -317,10 +321,8 @@ protected:
 	/* CAMERA VARIABLES */
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCamera;
-
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraSpringArmComponent;
-
 	float CameraLagMaxDistanceDefault;
 	float CameraLagSpeedDefault;
 
@@ -342,9 +344,12 @@ protected:
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool IsAiming = false;
 	bool DoneAiming = true;
+	// How far into aiming the player currently is in units of seconds
 	float CurrentAimTime = 0.0f;
 	// How close to the target location is the mesh while aiming
 	float CurrentAimAlpha = 0.0f;
+	// Used when smoothstepping back to original WeaponRecoilMoveDistanceMax after aiming
+	float WeaponRecoilMoveDistanceMaxDefault = 0.0f;
 	FVector MeshTargetLocationAiming = FVector::ZeroVector;
 	FQuat MeshTargetRotationAiming = FQuat::Identity;
 	FVector CurrentMeshLocationAimOffset = FVector::ZeroVector;
@@ -534,7 +539,7 @@ protected:
 	/**
 	 * Uses interpolation to position mesh correctly during reload sequence
 	 */
-	void HandleWeaponReload(float DeltaTime);
+	void HandleWeaponReloadVisuals(float DeltaTime);
 	
 	/**
 	 * These events detect when movement key has been double tapped 

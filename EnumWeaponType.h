@@ -17,6 +17,7 @@ class DREAMREALM_API UEnumWeaponType : public UUserDefinedEnum
 UENUM(BlueprintType)
 enum EWeaponType
 {
+	AIWeapon UMETA(DisplayName = "AIWeapon"),
 	SilencedPistol UMETA(DisplayName = "Silenced Pistol"),
 	BoltActionRifle UMETA(DisplayName = "Bolt-Action Rifle"),
 	SubmachineGun UMETA(DisplayName = "Submachine Gun"),

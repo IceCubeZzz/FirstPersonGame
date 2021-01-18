@@ -2,7 +2,7 @@
 
 #include "DreamRealmGameInstance.h"
 #include "Weapon_CPP.h"
-#include "BaseGun.h"
+#include "BaseGun_CPP.h"
 
 UDreamRealmGameInstance::UDreamRealmGameInstance()
 {

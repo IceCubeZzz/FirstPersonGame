@@ -2,7 +2,7 @@
 
 
 #include "BTTask_ShootVelocityCompensated.h"
-#include "BaseGun.h"
+#include "BaseGun_CPP.h"
 #include "BaseEnemy_CPP.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
@@ -15,7 +15,7 @@ EBTNodeResult::Type UBTTask_ShootVelocityCompensated::ExecuteTask(UBehaviorTreeC
 
 	if (Enemy != nullptr)
 	{
-		ABaseGun* EnemyGun = Cast<ABaseGun>(Enemy->Weapon);
+		ABaseGun_CPP* EnemyGun = Cast<ABaseGun_CPP>(Enemy->Weapon);
 		AActor* TargetRef = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject("Target"));
 		FVector TargetLocation = TargetRef->GetActorLocation() + AimOffset;
 
